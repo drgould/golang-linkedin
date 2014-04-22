@@ -2,6 +2,7 @@ package linkedin
 
 import (
 	"testing"
+	"net/url"
 	"net/http"
 	"net/http/httptest"
 	"bytes"
@@ -179,6 +180,52 @@ func TestUserProfile(t *testing.T) {
 	}
 
 	if uid != "USERID" {
+		t.Fatalf("invalid id: %v", uid)
+	}
+
+}
+
+func TestUserConnections(t *testing.T) {
+	var li API
+
+	token := "abcde"
+
+	RegisterResponder(
+		"GET",
+		"https://api.linkedin.com/v1/people/~/connections:(id)?count=3&oauth2_access_token="+token,
+		createResponder(nil,`{"values":[{"id":"USERID1"},{"id":"USERID2"},{"id":"USERID3"}]}`))
+	Activate(false)
+
+	fields := Fields{}
+	fields.Add("id")
+
+	li.SetToken(token)
+	
+	params := make(url.Values)
+	params.Add("count", "3")
+
+	data, err := li.Connections(http.DefaultClient, "~", fields, params)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	
+	if _, vals := data["values"]; !vals {
+		t.Fatal("no values returned")
+	}
+	
+	values := data["values"].([]interface{})
+	
+	if len(values) != 3 {
+		t.Fatalf("expecting 3 values got %v", len(values))
+	}
+
+	uid, ok := (values[0].(map[string]interface{}))["id"].(string)
+	if !ok {
+		t.Fatalf("id not returned: %#v", data)
+	}
+
+	if uid != "USERID1" {
 		t.Fatalf("invalid id: %v", uid)
 	}
 

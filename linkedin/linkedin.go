@@ -122,37 +122,22 @@ func getGroupIdString(id interface{}) (gid string, err error) {
 
 // Make a call to get info about the given user's profile
 func (a API) Profile(client *http.Client, user_id string, fields Fields) (j map[string]interface{}, err error) {
-	f := ""
-	if fields != nil {
-		f = fields.Encode()
-	}
-
 	return a.request(client, "profile", map[string]string{
 		"id": getUserIdString(user_id),
-		"fields": f,
+		"fields": fields.Encode(),
 	}, nil)
 }
 
 // Make a call to get info about the given user's connections
 func (a API) Connections(client *http.Client, user_id string, fields Fields, params url.Values) (j map[string]interface{}, err error) {
-	f := ""
-	if fields != nil {
-		f = fields.Encode()
-	}
-
 	return a.request(client, "connections", map[string]string{
 		"id": getUserIdString(user_id),
-		"fields": f,
+		"fields": fields.Encode(),
 	}, params)
 }
 
 // Make a call to get info about the given group
-func (a API) Group(client *http.Client, group_id interface{}, fields Fields) (j map[string]interface{}, err error) {
-	f := ""
-	if fields != nil {
-		f = fields.Encode()
-	}
-
+/*func (a API) Group(client *http.Client, group_id interface{}, fields Fields) (j map[string]interface{}, err error) {
 	gid, err := getGroupIdString(group_id)
 	if err != nil {
 		return j, err
@@ -160,9 +145,9 @@ func (a API) Group(client *http.Client, group_id interface{}, fields Fields) (j 
 	
 	return a.request(client, "group", map[string]string{
 		"id": gid,
-		"fields": f,
+		"fields": fields.Encode(),
 	}, nil)
-}
+}*/
 
 // Make a raw api call
 func (a API) Raw(client *http.Client, u interface{}) (j map[string]interface{}, e error) {
@@ -205,7 +190,7 @@ func (a API) Raw(client *http.Client, u interface{}) (j map[string]interface{}, 
 	}
 	
 	if _, error := d["errorCode"]; error {	// if an error code is provided in the json something went wrong
-		err = errors.New(string(response))
+		err = errors.New(string(data))
 		return nil, err
 	}
 	
