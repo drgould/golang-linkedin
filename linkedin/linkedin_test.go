@@ -229,3 +229,28 @@ func TestUserConnections(t *testing.T) {
 	}
 
 }
+func TestSendRequest(t *testing.T) {
+	var li API
+	params := make(map[string]interface{}, 0)
+	token := "abcde"
+	url := "/v1/companies/2414183/updates/key=UPDATE-c2414183-6028798180534009856/update-comments-as-company"
+	method := "POST"
+	//method := "PUT"
+	params["comment"] = "test123"
+	params["visibility"] = map[string]interface{}{"code": "anyone"}
+	params["content"] = map[string]interface{}{
+		"submitted-­url":       "https://www.example.com/content.html",
+		"title":                "Test Share with Content",
+		"description":          "content description",
+		"submitted‐image-­url": "https://www.example.com/img.jpg",
+	}
+	li.SetToken(token)
+
+	d, err := li.SendRequest(http.DefaultClient, url, method, params)
+	if err == nil {
+		if d["message"] != "Invalid access token." {
+			t.Fatalf("message not post: %#v", d)
+		}
+	}
+
+}
