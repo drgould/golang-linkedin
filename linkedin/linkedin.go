@@ -1,6 +1,7 @@
 package linkedin
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -218,4 +219,98 @@ func (a API) request(client *http.Client, endpoint string, options map[string]st
 	}
 
 	return a.Raw(client, *u)
+}
+
+//Conveient method for raw api calls which returns JSON in bytes format
+//
+//This is an open format so anyone if wanted to unmarshal to struct or any map[string]interface{}
+func (a API) RawResult(client *http.Client, u interface{}) (j []byte, e error) {
+	endpoint := url.URL{} // initialize the url
+
+	switch t := u.(type) {
+	default:
+		return nil, errors.New(fmt.Sprintf("Expecting string or *url.URL, got %v: %#v", t, u))
+	case string: // the url provided is a string so we need to parse it
+		ep, err := url.Parse(u.(string))
+		if err != nil {
+			return nil, err
+		}
+		endpoint = *ep
+	case url.URL: // the url provided is already parsed
+		endpoint = u.(url.URL)
+	}
+
+	qs := endpoint.Query()
+	qs.Add("oauth2_access_token", a.access_token) // add the access token to the query
+
+	req, _ := http.NewRequest("GET", apiRoot+endpoint.Path+"?"+qs.Encode(), nil) // make a new request
+	req.URL.Opaque = endpoint.Path                                               // make sure it doesn't query string encode the path
+	req.Header.Add("x-li-format", "json")                                        // we want json
+
+	r, err := client.Do(req) // send the request
+
+	if err != nil {
+		return nil, err
+	}
+
+	data, _ := ioutil.ReadAll(r.Body) // read the response data
+	r.Body.Close()
+
+	return data, nil
+}
+
+//Convenient method for normal POST/PUT call
+//
+//This api call will allow you to submit a comment and shares to linkedin
+//
+//https://developer.linkedin.com/docs/company-pages#company_comment
+//https://developer.linkedin.com/docs/company-pages#company_share
+func (a *API) SendRequest(client *http.Client, u interface{}, method string, params map[string]interface{}) (j map[string]interface{}, e error) {
+	endpoint := url.URL{} // initialize the url
+	switch t := u.(type) {
+	default:
+		return nil, errors.New(fmt.Sprintf("Expecting string or *url.URL, got %v: %#v", t, u))
+	case string: // the url provided is a string so we need to parse it
+		ep, err := url.Parse(u.(string))
+		if err != nil {
+			return nil, err
+		}
+		endpoint = *ep
+	case url.URL: // the url provided is already parsed
+		endpoint = u.(url.URL)
+	}
+
+	qs := endpoint.Query()
+	qs.Add("oauth2_access_token", a.access_token) // add the access token to the query
+	jsonStr, err := json.Marshal(params)
+	if err != nil {
+		fmt.Println("Can't reach linkedin server: ", err)
+	}
+	buf := bytes.NewBuffer([]byte(jsonStr))                                       //Create new buffer with the json bytes
+	req, _ := http.NewRequest(method, apiRoot+endpoint.Path+"?"+qs.Encode(), buf) // make a new request
+	req.URL.Opaque = endpoint.Path                                                // make sure it doesn't query string encode the path
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("x-li-format", "json") // sending to json format
+
+	r, err := client.Do(req) // send the request
+	if err != nil {
+		return nil, err
+	}
+
+	data, _ := ioutil.ReadAll(r.Body) // read the response data
+	r.Body.Close()
+	var d map[string]interface{}
+	if len(data) > 0 {
+		err = json.Unmarshal(data, &d)
+		// convert the response data to json
+		// It willl happen only if it fails to send
+		if err != nil {
+			return nil, err
+		}
+		if _, error := d["errorCode"]; error { // if an error code is provided in the json something went wrong
+			err = errors.New(string(data))
+			return nil, err
+		}
+	}
+	return d, nil
 }
