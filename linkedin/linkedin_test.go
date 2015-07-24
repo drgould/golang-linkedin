@@ -1,12 +1,12 @@
 package linkedin
 
 import (
-	"testing"
-	"net/url"
-	"net/http"
-	"net/http/httptest"
 	"bytes"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
 )
 
 func TestSetCredentials(t *testing.T) {
@@ -24,10 +24,10 @@ func TestSetCredentials(t *testing.T) {
 
 func TestAuthUrl(t *testing.T) {
 	var li API
-	
-	li.SetCredentials("**a**","**b**")
 
-	if li.AuthUrl("**c**","**d**") != "https://www.linkedin.com/uas/oauth2/authorization?response_type=code&client_id=**a**&state=**c**&redirect_uri=**d**" {
+	li.SetCredentials("**a**", "**b**")
+
+	if li.AuthUrl("**c**", "**d**") != "https://www.linkedin.com/uas/oauth2/authorization?response_type=code&client_id=**a**&state=**c**&redirect_uri=**d**" {
 		t.Fatal("url is not correct")
 	}
 }
@@ -35,7 +35,7 @@ func TestAuthUrl(t *testing.T) {
 func TestAuthRedirect(t *testing.T) {
 	var li API
 
-	li.SetCredentials("a","b")
+	li.SetCredentials("a", "b")
 
 	r, err := http.NewRequest("GET", "http://a.com/blah", nil)
 	if err != nil {
@@ -53,23 +53,23 @@ func TestAuthRedirect(t *testing.T) {
 
 type reqCheck func(*http.Request)
 
-func createResponder(rc reqCheck, response string) (Responder) {
-	return Responder(func (req *http.Request) (*http.Response, error) {
+func createResponder(rc reqCheck, response string) Responder {
+	return Responder(func(req *http.Request) (*http.Response, error) {
 		if rc != nil {
 			rc(req)
 		}
 
 		resp := &http.Response{
-			StatusCode: 200,
-			ProtoMajor: 1,
-			ProtoMinor: 0,
-			Body: ioutil.NopCloser(bytes.NewBufferString(response)),
+			StatusCode:    200,
+			ProtoMajor:    1,
+			ProtoMinor:    0,
+			Body:          ioutil.NopCloser(bytes.NewBufferString(response)),
 			ContentLength: int64(len(response)),
-			Request: req,
+			Request:       req,
 		}
 
 		resp.Header = make(map[string][]string)
-		resp.Header.Add("Content-Type","application/json")
+		resp.Header.Add("Content-Type", "application/json")
 
 		return resp, nil
 	})
@@ -77,7 +77,6 @@ func createResponder(rc reqCheck, response string) (Responder) {
 
 func TestRetrieveAccessToken(t *testing.T) {
 	var li API
-
 
 	key := "key"
 	secret := "secret"
@@ -94,7 +93,7 @@ func TestRetrieveAccessToken(t *testing.T) {
 
 				if code, ok := qs["code"]; ok {
 					if code[0] != authcode {
-						t.Fatal("code is not '"+authcode+"'")
+						t.Fatal("code is not '" + authcode + "'")
 					}
 				} else {
 					t.Fatal("code not given")
@@ -160,7 +159,7 @@ func TestUserProfile(t *testing.T) {
 	RegisterResponder(
 		"GET",
 		"https://api.linkedin.com/v1/people/~:(id)?oauth2_access_token="+token,
-		createResponder(nil,`{"id":"USERID"}`))
+		createResponder(nil, `{"id":"USERID"}`))
 	Activate(false)
 
 	fields := Fields{}
@@ -193,14 +192,14 @@ func TestUserConnections(t *testing.T) {
 	RegisterResponder(
 		"GET",
 		"https://api.linkedin.com/v1/people/~/connections:(id)?count=3&oauth2_access_token="+token,
-		createResponder(nil,`{"values":[{"id":"USERID1"},{"id":"USERID2"},{"id":"USERID3"}]}`))
+		createResponder(nil, `{"values":[{"id":"USERID1"},{"id":"USERID2"},{"id":"USERID3"}]}`))
 	Activate(false)
 
 	fields := Fields{}
 	fields.Add("id")
 
 	li.SetToken(token)
-	
+
 	params := make(url.Values)
 	params.Add("count", "3")
 
@@ -209,13 +208,13 @@ func TestUserConnections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	if _, vals := data["values"]; !vals {
 		t.Fatal("no values returned")
 	}
-	
+
 	values := data["values"].([]interface{})
-	
+
 	if len(values) != 3 {
 		t.Fatalf("expecting 3 values got %v", len(values))
 	}
