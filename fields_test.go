@@ -25,7 +25,7 @@ func TestAddSingleNoSub(t *testing.T) {
 func TestAddSingleWithSub(t *testing.T) {
 	fields := Fields{}
 
-	fields.Add("a","b")
+	fields.Add("a", "b")
 
 	if len(fields.Values) == 1 {
 		if value, ok := fields.Values["a"]; ok {
@@ -43,7 +43,7 @@ func TestAddSingleWithSub(t *testing.T) {
 func TestAddSingleWithMultiSub(t *testing.T) {
 	fields := Fields{}
 
-	fields.Add("a","b","c")
+	fields.Add("a", "b", "c")
 
 	if len(fields.Values) == 1 {
 		if value, ok := fields.Values["a"]; ok {
@@ -61,7 +61,7 @@ func TestAddSingleWithMultiSub(t *testing.T) {
 func TestMultiAdd(t *testing.T) {
 	fields := Fields{}
 
-	fields.Add("a","b")
+	fields.Add("a", "b")
 	fields.Add("c")
 
 	if len(fields.Values) != 2 {
@@ -82,7 +82,7 @@ func TestEncodeSingleNoSub(t *testing.T) {
 func TestEncodeSingleWithSub(t *testing.T) {
 	fields := Fields{}
 
-	fields.Add("a","b")
+	fields.Add("a", "b")
 
 	if fields.Encode() != ":(a:(b))" {
 		t.Fatalf("expecting ':(a:(b))', got '%v'", fields.Encode())
@@ -92,7 +92,7 @@ func TestEncodeSingleWithSub(t *testing.T) {
 func TestEncodeSingleMultiSub(t *testing.T) {
 	fields := Fields{}
 
-	fields.Add("a","b","c")
+	fields.Add("a", "b", "c")
 
 	if fields.Encode() != ":(a:(b,c))" {
 		t.Fatalf("expecting ':(a:(b,c))', got '%v'", fields.Encode())
@@ -103,7 +103,7 @@ func TestEncodeMulti(t *testing.T) {
 	fields := Fields{}
 
 	fields.Add("a")
-	fields.Add("b","c")
+	fields.Add("b", "c")
 
 	if fields.Encode() != ":(a,b:(c))" {
 		t.Fatalf("expecting ':(a,b:(c))', got '%v'", fields.Encode())

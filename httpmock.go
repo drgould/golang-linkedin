@@ -23,7 +23,7 @@ type MockTransport struct {
 // the internal list of responders is consulted to handle the request.  If no responder is found
 // an error is returned, which is the equivalent of a network error.
 func (m *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	u := req.URL.Scheme+"://"+req.URL.Host+req.URL.Path+"?"+req.URL.Query().Encode()
+	u := req.URL.Scheme + "://" + req.URL.Host + req.URL.Path + "?" + req.URL.Query().Encode()
 
 	key := req.Method + " " + u
 
