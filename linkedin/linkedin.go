@@ -47,9 +47,15 @@ func (a API) GetToken() (t string) {
 }
 
 // Compile the authentication URL
-func (a API) AuthUrl(state string, redirect_url string) (url string) {
-	return "https://www.linkedin.com/uas/oauth2/authorization?response_type=code&client_id=" + a.oauth_key +
-		"&state=" + state + "&redirect_uri=" + redirect_url
+func (a API) AuthUrl(state string, redirect_url string) string {
+	aURL := "https://www.linkedin.com/oauth/v2/authorization?"
+	params := url.Values{}
+	params.Set("response_type", "code")
+	params.Set("client_secret", a.oauth_secret)
+	params.Set("client_id", a.oauth_key)
+	params.Set("state", state)
+	params.Set("redirect_uri", redirect_url)
+	return aURL + params.Encode()
 }
 
 // Convenience method to redirect the user to the authentication url
@@ -59,38 +65,34 @@ func (a API) Auth(w http.ResponseWriter, r *http.Request, state string, redirect
 
 // Convert an authorization code to an access token
 func (a *API) RetrieveAccessToken(client *http.Client, code string, redirect_url string) (t string, e error) {
-
-	// send the request
-	resp, err := client.Get("https://www.linkedin.com/uas/oauth2/accessToken?grant_type=authorization_code&code=" + code + "&redirect_uri=" +
-		redirect_url + "&client_id=" + a.oauth_key + "&client_secret=" + a.oauth_secret)
-
+	aURL := "https://www.linkedin.com/oauth/v2/accessToken?"
+	params := url.Values{}
+	params.Set("client_id", a.oauth_key)
+	params.Set("client_secret", a.oauth_secret)
+	params.Set("grant_type", "authorization_code")
+	params.Set("redirect_uri", redirect_url)
+	params.Set("code", code)
+	resp, err := client.Post(aURL+params.Encode(), "application/x-www-form-urlencoded", nil)
 	if err != nil {
 		return t, err
 	}
-
 	// read the response data
 	data, _ := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
-
 	// decode the response data to json
 	var response map[string]interface{}
 	err = json.Unmarshal(data, &response)
-
 	if err != nil {
 		return t, err
 	}
-
 	// if there is an "error" index something went wrong
 	if _, err := response["error"]; err {
 		return t, errors.New(response["error"].(string) + " - " + response["error_description"].(string))
 	}
-
 	// pull out the token
 	t = response["access_token"].(string)
-
 	// set my access token
 	a.SetToken(t)
-
 	// return token
 	return t, nil
 }
