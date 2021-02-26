@@ -6,95 +6,95 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 )
 
-var apiRoot = "https://api.linkedin.com" // api domain
-var apiUser = "/v1/people/:id"           // user root
-var apiGroup = "/v1/groups/:id"          // group root
+var (
+	apiVer     = "/v2/"
+	apiRoot    = "https://api.linkedin.com" + apiVer // api domain
+	apiProfile = apiRoot + "me"                      // user root
+	//PeopleURL https://docs.microsoft.com/en-us/linkedin/shared/integrations/people/profile-api?context=linkedin/marketing/context
+	PeopleURL = apiRoot + "people/(id:{people-id})"
+	apiGroup  = "groups/:id" // group root
+	//OrgURL https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/organizations/organization-access-control#find-access-control-information
+	OrgURL = apiRoot + "organizationAcls"
+	//PageURL https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/organizations/organization-lookup-api h
+	PageURL = apiRoot + "organizations"
+	//ShareURL  https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/share-api
+	ShareURL = apiRoot + "shares"
+	//CommentURL https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/network-update-social-actions#retrieve-social-actions
+	CommentURL     = apiRoot + "socialActions/{activity-id}/comments"
+	authURL        = "https://www.linkedin.com/oauth/v2/authorization"
+	accessTokenURL = "https://www.linkedin.com/oauth/v2/accessToken"
+	scopes         = []string{"r_organization_social", "w_organization_social", "rw_organization_admin", "rw_ads", "r_ads_reporting", "r_liteprofile"}
+	//ProfileURL ....
+	ProfileURL = apiProfile
+)
 
 // api endpoint path
 var apiUrls = map[string]string{
-	"profile":     apiUser + ":fields",             // user profile request
-	"connections": apiUser + "/connections:fields", // user connections request
-	"group":       apiGroup + ":fields",            // group info request
+	"profile":     apiProfile,                         // user profile request
+	"connections": apiProfile + "/connections:fields", // user connections request
+	"group":       apiGroup + ":fields",               // group info request
 }
 
-// api base
+// API base
 type API struct {
-	oauth_key    string // your oauth key
-	oauth_secret string // your oauth secret
-	access_token string // the user's access token
+	OauthKey     string // your oauth key
+	OauthSecret  string // your oauth secret
+	AccessToken  string // the user's access token
+	RefreshToken string
 }
 
-// Set your api key and secret
+// SetCredentials your api key and secret
 func (a *API) SetCredentials(key string, secret string) {
-	a.oauth_key = key
-	a.oauth_secret = secret
+	a.OauthKey = key
+	a.OauthSecret = secret
 }
 
-// Set the access token for this user
+// SetToken the access token for this user
 func (a *API) SetToken(token string) {
-	a.access_token = token
+	a.AccessToken = token
 }
 
-// Get the user's access token
+// GetToken the user's access token
 func (a API) GetToken() (t string) {
-	return a.access_token
+	return a.AccessToken
 }
 
-// Compile the authentication URL
-func (a API) AuthUrl(state string, redirect_url string) string {
-	aURL := "https://www.linkedin.com/oauth/v2/authorization?"
-	params := url.Values{}
-	params.Set("response_type", "code")
-	params.Set("client_secret", a.oauth_secret)
-	params.Set("client_id", a.oauth_key)
-	params.Set("state", state)
-	params.Set("redirect_uri", redirect_url)
-	return aURL + params.Encode()
+//AuthURL Compile the authentication URL
+func (a API) AuthURL(state string, redirectURL string) (URL string) {
+	scp := strings.Join(scopes, "%20")
+	return authURL + "?response_type=code&client_id=" + a.OauthKey +
+		"&state=" + state + "&redirect_uri=" + redirectURL + "&scope=" + scp
 }
 
-// Convenience method to redirect the user to the authentication url
-func (a API) Auth(w http.ResponseWriter, r *http.Request, state string, redirect_url string) {
-	http.Redirect(w, r, a.AuthUrl(state, redirect_url), http.StatusFound)
+//Auth Convenience method to redirect the user to the authentication url
+func (a API) Auth(w http.ResponseWriter, r *http.Request, state string, redirectURL string) {
+	http.Redirect(w, r, a.AuthURL(state, redirectURL), http.StatusFound)
 }
 
-// Convert an authorization code to an access token
-func (a *API) RetrieveAccessToken(client *http.Client, code string, redirect_url string) (t string, e error) {
-	aURL := "https://www.linkedin.com/oauth/v2/accessToken?"
-	params := url.Values{}
-	params.Set("client_id", a.oauth_key)
-	params.Set("client_secret", a.oauth_secret)
-	params.Set("grant_type", "authorization_code")
-	params.Set("redirect_uri", redirect_url)
-	params.Set("code", code)
-	resp, err := client.Post(aURL+params.Encode(), "application/x-www-form-urlencoded", nil)
+//RetrieveAccessToken Convert an authorization code to an access token
+func (a *API) RetrieveAccessToken(client *http.Client, code string, redirectURL string) ([]byte, error) {
+	var response []byte
+	// send the request
+	resp, err := client.Get(accessTokenURL + "?grant_type=authorization_code&code=" + code + "&redirect_uri=" +
+		redirectURL + "&client_id=" + a.OauthKey + "&client_secret=" + a.OauthSecret)
+
 	if err != nil {
-		return t, err
+		return response, err
 	}
-	// read the response data
-	data, _ := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
-	// decode the response data to json
-	var response map[string]interface{}
-	err = json.Unmarshal(data, &response)
+	response, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return t, err
+		return response, err
 	}
-	// if there is an "error" index something went wrong
-	if _, err := response["error"]; err {
-		return t, errors.New(response["error"].(string) + " - " + response["error_description"].(string))
-	}
-	// pull out the token
-	t = response["access_token"].(string)
-	// set my access token
-	a.SetToken(t)
-	// return token
-	return t, nil
+	defer resp.Body.Close()
+
+	return response, nil
 }
 
 // format the given user id for api calls
@@ -108,7 +108,7 @@ func getUserIdString(id string) (uid string) {
 	}
 }
 
-// format the given group id for api calls
+//getGroupIdString format the given group id for api calls
 func getGroupIdString(id interface{}) (gid string, err error) {
 	switch t := id.(type) {
 	case string:
@@ -119,62 +119,22 @@ func getGroupIdString(id interface{}) (gid string, err error) {
 	case uint64:
 		return strconv.FormatUint(id.(uint64), 10), nil // group id as an int
 	default:
-		return gid, errors.New(fmt.Sprintf("Group ID type exception: Expecting string or uint64 got %T", t))
+		return gid, fmt.Errorf("Group ID type exception: Expecting string or uint64 got %T", t)
 	}
 }
 
-// Make a call to get info about the given user's profile
-func (a API) Profile(client *http.Client, user_id string, fields Fields) (j map[string]interface{}, err error) {
-	return a.request(client, "profile", map[string]string{
-		"id":     getUserIdString(user_id),
-		"fields": fields.Encode(),
-	}, nil)
-}
-
-// Make a call to get info about the given user's connections
-func (a API) Connections(client *http.Client, user_id string, fields Fields, params url.Values) (j map[string]interface{}, err error) {
-	return a.request(client, "connections", map[string]string{
-		"id":     getUserIdString(user_id),
-		"fields": fields.Encode(),
-	}, params)
-}
-
-// Make a call to get info about the given group
-/*func (a API) Group(client *http.Client, group_id interface{}, fields Fields) (j map[string]interface{}, err error) {
-	gid, err := getGroupIdString(group_id)
+//Raw Make an http request to get results
+func (a API) Raw(client *http.Client, u string, params url.Values) ([]byte, error) {
+	req, err := http.NewRequest("GET", u, nil) // make a new request
 	if err != nil {
-		return j, err
+		return nil, err
 	}
-
-	return a.request(client, "group", map[string]string{
-		"id": gid,
-		"fields": fields.Encode(),
-	}, nil)
-}*/
-
-// Make a raw api call
-func (a API) Raw(client *http.Client, u interface{}) (j map[string]interface{}, e error) {
-	endpoint := url.URL{} // initialize the url
-
-	switch t := u.(type) {
-	default:
-		return nil, errors.New(fmt.Sprintf("Expecting string or *url.URL, got %v: %#v", t, u))
-	case string: // the url provided is a string so we need to parse it
-		ep, err := url.Parse(u.(string))
-		if err != nil {
-			return nil, err
-		}
-		endpoint = *ep
-	case url.URL: // the url provided is already parsed
-		endpoint = u.(url.URL)
+	if params != nil {
+		req.URL.RawQuery = params.Encode()
 	}
-
-	qs := endpoint.Query()
-	qs.Add("oauth2_access_token", a.access_token) // add the access token to the query
-
-	req, _ := http.NewRequest("GET", apiRoot+endpoint.Path+"?"+qs.Encode(), nil) // make a new request
-	req.URL.Opaque = endpoint.Path                                               // make sure it doesn't query string encode the path
-	req.Header.Add("x-li-format", "json")                                        // we want json
+	token := a.GetToken()
+	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("X-Restli-Protocol-Version", "2.0.0")
 
 	r, err := client.Do(req) // send the request
 
@@ -182,26 +142,17 @@ func (a API) Raw(client *http.Client, u interface{}) (j map[string]interface{}, 
 		return nil, err
 	}
 
-	data, _ := ioutil.ReadAll(r.Body) // read the response data
-	r.Body.Close()
-
-	var d map[string]interface{}
-	err = json.Unmarshal(data, &d) // convert the response data to json
-
+	data, err := ioutil.ReadAll(r.Body) // read the response data
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 
-	if _, error := d["errorCode"]; error { // if an error code is provided in the json something went wrong
-		err = errors.New(string(data))
-		return nil, err
-	}
-
-	return d, nil
+	return data, nil
 }
 
 // Convenience method for normal api calls
-func (a API) request(client *http.Client, endpoint string, options map[string]string, params url.Values) (j map[string]interface{}, e error) {
+func (a API) request(client *http.Client, endpoint string, options map[string]string, params url.Values) ([]byte, error) {
 	ep, ok := apiUrls[endpoint]
 	if !ok {
 		return nil, errors.New("Endpoint \"" + endpoint + "\" not defined")
@@ -215,104 +166,71 @@ func (a API) request(client *http.Client, endpoint string, options map[string]st
 		ep += "?" + params.Encode()
 	}
 
-	u, err := url.Parse(ep)
-	if err != nil {
-		return nil, err
-	}
-
-	return a.Raw(client, *u)
+	return a.Raw(client, ep, nil)
 }
 
-//Conveient method for raw api calls which returns JSON in bytes format
+//RawNonHeader Conveient method for raw api calls which returns JSON in bytes format
 //
 //This is an open format so anyone if wanted to unmarshal to struct or any map[string]interface{}
-func (a API) RawResult(client *http.Client, u interface{}) (j []byte, e error) {
-	endpoint := url.URL{} // initialize the url
-
-	switch t := u.(type) {
-	default:
-		return nil, errors.New(fmt.Sprintf("Expecting string or *url.URL, got %v: %#v", t, u))
-	case string: // the url provided is a string so we need to parse it
-		ep, err := url.Parse(u.(string))
-		if err != nil {
-			return nil, err
-		}
-		endpoint = *ep
-	case url.URL: // the url provided is already parsed
-		endpoint = u.(url.URL)
+func (a API) RawNonHeader(client *http.Client, URL string, params url.Values) (j []byte, e error) {
+	req, err := http.NewRequest("GET", URL, nil) // make a new request
+	if err != nil {
+		return nil, err
 	}
-
-	qs := endpoint.Query()
-	qs.Add("oauth2_access_token", a.access_token) // add the access token to the query
-
-	req, _ := http.NewRequest("GET", apiRoot+endpoint.Path+"?"+qs.Encode(), nil) // make a new request
-	req.URL.Opaque = endpoint.Path                                               // make sure it doesn't query string encode the path
-	req.Header.Add("x-li-format", "json")                                        // we want json
-
+	if params != nil {
+		req.URL.RawQuery = params.Encode()
+	}
+	token := a.GetToken()
+	req.Header.Add("Authorization", "Bearer "+token)
 	r, err := client.Do(req) // send the request
-
 	if err != nil {
 		return nil, err
 	}
 
-	data, _ := ioutil.ReadAll(r.Body) // read the response data
-	r.Body.Close()
+	data, err := ioutil.ReadAll(r.Body) // read the response data
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
 
 	return data, nil
 }
 
-//Convenient method for normal POST/PUT call
+//SendRequest Convenient method for normal POST/PUT call
 //
 //This api call will allow you to submit a comment and shares to linkedin
 //
 //https://developer.linkedin.com/docs/company-pages#company_comment
 //https://developer.linkedin.com/docs/company-pages#company_share
-func (a *API) SendRequest(client *http.Client, u interface{}, method string, params map[string]interface{}) (j map[string]interface{}, e error) {
-	endpoint := url.URL{} // initialize the url
-	switch t := u.(type) {
-	default:
-		return nil, errors.New(fmt.Sprintf("Expecting string or *url.URL, got %v: %#v", t, u))
-	case string: // the url provided is a string so we need to parse it
-		ep, err := url.Parse(u.(string))
-		if err != nil {
-			return nil, err
-		}
-		endpoint = *ep
-	case url.URL: // the url provided is already parsed
-		endpoint = u.(url.URL)
+func (a *API) SendRequest(client *http.Client, URL string, params map[string]interface{}) ([]byte, error) {
+	if params == nil {
+		return nil, errors.New("empty params can not send")
 	}
-
-	qs := endpoint.Query()
-	qs.Add("oauth2_access_token", a.access_token) // add the access token to the query
-	jsonStr, err := json.Marshal(params)
+	jsonByte, err := json.Marshal(params)
 	if err != nil {
-		fmt.Println("Can't reach linkedin server: ", err)
+		return nil, err
 	}
-	buf := bytes.NewBuffer([]byte(jsonStr))                                       //Create new buffer with the json bytes
-	req, _ := http.NewRequest(method, apiRoot+endpoint.Path+"?"+qs.Encode(), buf) // make a new request
-	req.URL.Opaque = endpoint.Path                                                // make sure it doesn't query string encode the path
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("x-li-format", "json") // sending to json format
+	log.Printf("jsonByte=%v", string(jsonByte))
+	req, err := http.NewRequest(http.MethodPost, URL, bytes.NewBuffer(jsonByte))
+	if err != nil {
+		return nil, err
+	}
+	token := a.GetToken()
+	req.Header.Add("Authorization", "Bearer "+token)
+	//req.Header.Add("X-Restli-Protocol-Version", "2.0.0")
+	//req.Header.Add("Content-Type", "application/json")
 
 	r, err := client.Do(req) // send the request
+
 	if err != nil {
 		return nil, err
 	}
 
-	data, _ := ioutil.ReadAll(r.Body) // read the response data
-	r.Body.Close()
-	var d map[string]interface{}
-	if len(data) > 0 {
-		err = json.Unmarshal(data, &d)
-		// convert the response data to json
-		// It willl happen only if it fails to send
-		if err != nil {
-			return nil, err
-		}
-		if _, error := d["errorCode"]; error { // if an error code is provided in the json something went wrong
-			err = errors.New(string(data))
-			return nil, err
-		}
+	data, err := ioutil.ReadAll(r.Body) // read the response data
+	if err != nil {
+		return nil, err
 	}
-	return d, nil
+	defer r.Body.Close()
+
+	return data, nil
 }
