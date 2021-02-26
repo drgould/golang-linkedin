@@ -200,8 +200,7 @@ func (a API) RawNonHeader(client *http.Client, URL string, params url.Values) (j
 //
 //This api call will allow you to submit a comment and shares to linkedin
 //
-//https://developer.linkedin.com/docs/company-pages#company_comment
-//https://developer.linkedin.com/docs/company-pages#company_share
+//https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/share-api
 func (a *API) SendRequest(client *http.Client, URL string, params map[string]interface{}) ([]byte, error) {
 	if params == nil {
 		return nil, errors.New("empty params can not send")
