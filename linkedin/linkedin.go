@@ -27,7 +27,9 @@ var (
 	//ShareURL  https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/share-api
 	ShareURL = apiRoot + "shares"
 	//CommentURL https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/network-update-social-actions#retrieve-social-actions
-	CommentURL     = apiRoot + "socialActions/{activity-id}/comments"
+	CommentURL = apiRoot + "socialActions/{activity-id}/comments"
+	//AssetURL https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/vector-asset-api
+	AssetURL       = apiRoot + "/assets"
 	authURL        = "https://www.linkedin.com/oauth/v2/authorization"
 	accessTokenURL = "https://www.linkedin.com/oauth/v2/accessToken"
 	scopes         = []string{"r_organization_social", "w_organization_social", "rw_organization_admin", "rw_ads", "r_ads_reporting", "r_liteprofile"}
@@ -44,10 +46,11 @@ var apiUrls = map[string]string{
 
 // API base
 type API struct {
-	OauthKey     string // your oauth key
-	OauthSecret  string // your oauth secret
-	AccessToken  string // the user's access token
-	RefreshToken string
+	OauthKey        string // your oauth key
+	OauthSecret     string // your oauth secret
+	AccessToken     string // the user's access token
+	RefreshToken    string
+	ProtocolVersion uint
 }
 
 // SetCredentials your api key and secret
@@ -216,8 +219,10 @@ func (a *API) SendRequest(client *http.Client, URL string, params interface{}) (
 	}
 	token := a.GetToken()
 	req.Header.Add("Authorization", "Bearer "+token)
-	//req.Header.Add("X-Restli-Protocol-Version", "2.0.0")
-	//req.Header.Add("Content-Type", "application/json")
+	if a.ProtocolVersion == 2 {
+		req.Header.Add("X-Restli-Protocol-Version", "2.0.0")
+		req.Header.Add("Content-Type", "application/json")
+	}
 
 	r, err := client.Do(req) // send the request
 
