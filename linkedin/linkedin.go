@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -29,7 +30,7 @@ var (
 	//CommentURL https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/network-update-social-actions#retrieve-social-actions
 	CommentURL = apiRoot + "socialActions/{activity-id}/comments"
 	//AssetURL https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/vector-asset-api
-	AssetURL       = apiRoot + "/assets"
+	AssetURL       = apiRoot + "assets"
 	authURL        = "https://www.linkedin.com/oauth/v2/authorization"
 	accessTokenURL = "https://www.linkedin.com/oauth/v2/accessToken"
 	scopes         = []string{"r_organization_social", "w_organization_social", "rw_organization_admin", "rw_ads", "r_ads_reporting", "r_liteprofile"}
@@ -235,6 +236,31 @@ func (a *API) SendRequest(client *http.Client, URL string, params interface{}) (
 		return nil, err
 	}
 	defer r.Body.Close()
-
 	return data, nil
+}
+
+//UploadFile Use the uploadUrl from the previous step to upload the image. Use a //PUT method to upload the image.
+//The upload call requires a valid OAuth token in the 'Authorization' header.
+//This is different than the upload video call which does not accept an OAuth
+//token.
+//
+//https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/vector-asset-api#upload-the-video
+func (a *API) UploadFile(client *http.Client, URL string, file *os.File, fileSize int64) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPut, URL, file)
+	req.ContentLength = fileSize
+	if err != nil {
+		return nil, err
+	}
+	token := a.GetToken()
+	if a.ProtocolVersion != 2 {
+		req.Header.Add("Authorization", "Bearer "+token)
+	}
+	r, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	//resp body closed
+	defer r.Body.Close()
+
+	return r, nil
 }
