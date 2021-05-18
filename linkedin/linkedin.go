@@ -245,7 +245,7 @@ func (a *API) SendRequest(client *http.Client, URL string, params interface{}) (
 //token.
 //
 //https://docs.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/vector-asset-api#upload-the-video
-func (a *API) UploadFile(client *http.Client, URL string, file *os.File, fileSize int64) (*http.Response, error) {
+func (a *API) UploadFile(client *http.Client, URL string, file io.ReadCloser, fileSize int64) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodPut, URL, file)
 	req.ContentLength = fileSize
 	if err != nil {
